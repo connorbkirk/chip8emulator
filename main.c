@@ -13,7 +13,7 @@ void start(){
 
 int main(int argv, char ** argc){
 	chip_init();
-	chip_load("fuck");
+	chip_load(argc[1]);
 	display_init();	
-	start();
+//	start();
 }

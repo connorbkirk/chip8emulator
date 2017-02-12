@@ -11,6 +11,27 @@ void chip_init(){
 }
 
 void chip_load(char * file){
+	FILE *fp;
+	size_t read;
+
+	//open file in read-only mode	
+	fp = fopen(file, "r");
+	
+	if(!fp){
+		fprintf(stderr, "Could not open file: %s\n", file);
+		exit(EXIT_FAILURE);
+	}
+	
+	read = fread(memory, 1, 4096-0x200, fp);
+	if( read == 0){
+		fprintf(stderr, "File %s could not be read\n", file);
+		exit(EXIT_FAILURE);	
+	}	
+
+/*	for(int i = 0; i < 4096; i++)
+		printf("%02x\n", memory[i]);
+*/	
+	fclose(fp);
 }
 
 void chip_run(){
@@ -47,7 +68,6 @@ void removeDrawFlag(){
 
 
 int display_init(){
-	
 	printf("Starting display\n");
 	if(SDL_Init(SDL_INIT_VIDEO) < 0) return 1;
 
