@@ -22,7 +22,7 @@ void chip_load(char * file){
 		exit(EXIT_FAILURE);
 	}
 	
-	read = fread(memory, 1, 4096-0x200, fp);
+	read = fread(memory+0x200, 1, 4096-0x200, fp);
 	if( read == 0){
 		fprintf(stderr, "File %s could not be read\n", file);
 		exit(EXIT_FAILURE);	
@@ -35,25 +35,68 @@ void chip_load(char * file){
 }
 
 void chip_run(){
+	unsigned short opcode, address;
+
 	//fetch opcode
-	unsigned short opcode = memory[pc] << 8 | memory[pc+1];
-	printf("Opcode: %d\n", opcode);
+	opcode = memory[pc] << 8 | memory[pc+1];
+	printf("Opcode: %02x\n", opcode);
 	
 	//decode opcode
-	switch(opcode & 0xF000){//look @ first nibble
-		case 0x8000://need value from last nibble
-			switch(opcode & 0x000F){
-				case 0x0000:
-					//8xy0
+	switch(opcode & 0xF000){//mask to get first nibble
+		case 0x1000://1NNN - jump to address NNN
+			address = opcode & 0x0FFF;//bitmap
+			pc = address;	
+			break;
+
+		case 0x2000://2NNN - call subroutine at address NNN
+			address = opcode & 0x0FFF;//bitmap to get last 3
+		
+			//store pc in stack	
+			stack[sp++] = pc;
+
+			pc = address;		
+			break;
+
+		case 0x3000://3XNN - skips the next instructions if VX == NN
+			if( v[opcode&0x0F00] == opcode&0x00FF )
+				pc+=4;
+			else
+				pc+=2;	
+			break;
+		
+		case 0x6000://6XNN - set VX to NN
+			v[opcode&0x0F00] = opcode&0x00FF;
+			pc+=2;	
+			break;
+		
+		case 0x7000://7XNN - add VX to NN
+			v[opcode&0x0F00] += opcode&0x00FF;
+			pc+=2;	
+			break;	
+
+		case 0x8000:
+			switch(opcode & 0x000F){//mask to get last nibble
+				case 0x0000://8XY0 - set VX to XY
 					v[opcode&0x0f00]=v[opcode&0x00f0];
-				break;
+					break;
 				default:
-					printf("Unsupported opcode. System exit\n");
+					printf("Unsupported opcode: %04x\n. System exit\n", opcode);
 					exit(EXIT_FAILURE);	
 					break;
 			}
+
+		case 0xA000://ANNN - set i to NNN
+			address = opcode & 0xF000;
+			i = address;
+			pc+=2;
+			break;
+
+		case 0xD000: //DXYN - draw a sprite (X,Y) size (8,N) located at I
+			pc+=2;	
+			break;
+		
 		default:
-			printf("Unsupported opcode. System exit\n");
+			printf("Unsupported opcode: %04x. System exit\n", opcode);
 			exit(EXIT_FAILURE);	
 			break;
 	}	

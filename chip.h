@@ -3,8 +3,10 @@
 
 #include <stdbool.h>
 #include <stdio.h>
-#include <SDL/SDL.h>
-
+#include <SDL2/SDL.h>
+#include <stdlib.h>
+#include <signal.h>
+	
 #define RESIZE_FACTOR 10
 #define SCREEN_HEIGHT 320
 #define SCREEN_WIDTH 640
