@@ -160,6 +160,7 @@ int display_init(){
 }
 
 int display_update(){
+	printf("updating\n");
 	SDL_UpdateTexture(texture, NULL, display, SCREEN_WIDTH/RESIZE_FACTOR * sizeof(unsigned char *));
 
 	SDL_RenderClear(renderer);

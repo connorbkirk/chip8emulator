@@ -2,16 +2,16 @@
 
 void start(){
 	while(1){
-		SDL_Event e;
-		if(e.type == SDL_QUIT)
-			exit(0);
-		if(SDL_PollEvent(&e))
-			continue;
 		chip_run();
-		if(needsRedraw){
-			display_update();	
-			removeDrawFlag();
+		SDL_Event e;
+		if(SDL_PollEvent(&e)){
+			if(e.type == SDL_QUIT)
+				exit(EXIT_SUCCESS);
 		}
+		if(needsRedraw){
+			needsRedraw = false;
+			display_update();
+		}	
 		usleep(10000);
 	}
 }
