@@ -51,6 +51,26 @@ void chip_run(){
 	
 	//decode opcode
 	switch(opcode & 0xF000){//mask to get first nibble
+		case 0x0000://Multi-case
+			switch(opcode & 0x0FF){//mask to get last 2 nibbles
+				case 0x00E0: //clear screen
+					display_clear();
+					pc+=2;
+					break;
+				
+				case 0x00EE: //return from subroutine
+					sp--;	
+					pc = stack[sp] + 2;
+					printf("Returning to %04x\n", pc);	
+					break;
+			
+				default: 
+					printf("Unsupported opcode: %04x\n. System exit\n", opcode);
+                                        exit(EXIT_FAILURE);			
+					break;
+			}
+			break;
+			
 		case 0x1000://1NNN - jump to address NNN
 			address = opcode & 0x0FFF;//bitmap
 			pc = address;
@@ -95,6 +115,7 @@ void chip_run(){
 					exit(EXIT_FAILURE);	
 					break;
 			}
+			break;
 
 		case 0xA000://ANNN - set i to NNN
 			address = opcode & 0x0FFF;

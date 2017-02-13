@@ -7,7 +7,7 @@ void start(){
 			needsRedraw = false;
 			display_update();
 		}	
-		usleep(50000);
+		usleep(20000);
 	}
 }
 
