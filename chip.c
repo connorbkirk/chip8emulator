@@ -53,7 +53,7 @@ void chip_run(){
 	switch(opcode & 0xF000){//mask to get first nibble
 		case 0x1000://1NNN - jump to address NNN
 			address = opcode & 0x0FFF;//bitmap
-			pc = address;	
+			pc = address;
 			break;
 
 		case 0x2000://2NNN - call subroutine at address NNN
@@ -63,23 +63,26 @@ void chip_run(){
 			stack[sp++] = pc;
 
 			pc = address;		
+			printf("Calling %04x\n", address);	
 			break;
 
 		case 0x3000://3XNN - skips the next instructions if VX == NN
-			if( v[opcode&0x0F00] == (opcode&0x00FF) )
+			if( v[ (opcode&0x0F00) >> 8 ] == (opcode&0x00FF) )
 				pc+=4;
 			else
 				pc+=2;	
 			break;
 		
 		case 0x6000://6XNN - set VX to NN
-			v[opcode&0x0F00] = opcode&0x00FF;
-			pc+=2;	
+			v[ (opcode&0x0F00) >> 8 ] = opcode&0x00FF;
+			pc+=2;
+			printf("Setting v[%d] to %d\n", (opcode&0x0F00) >> 8, v[(opcode&0x0F00) >> 8]);	
 			break;
 		
 		case 0x7000://7XNN - add VX to NN
-			v[opcode&0x0F00] += opcode&0x00FF;
+			v[ (opcode&0x0F00) >> 8 ] += opcode&0x00FF;
 			pc+=2;	
+			printf("Adding %d to v[%d] = %d\n", opcode&0x00FF, (opcode&0x0F00) >> 8, v[(opcode&0x0F00) >> 8]);	
 			break;	
 
 		case 0x8000:
@@ -97,18 +100,19 @@ void chip_run(){
 			address = opcode & 0x0FFF;
 			i = address;
 			pc+=2;
+			printf("Set i to %04x\n", i);
 			break;
 
 		case 0xD000: //DXYN - draw a sprite (X,Y) size (8,N) located at I
-			x = v[ opcode & 0x0F00 ];	
-			y = v[ opcode & 0x00F0 ];	
+			x = v[ (opcode & 0x0F00) >> 8 ];	
+			y = v[ (opcode & 0x00F0) >> 4 ];	
 			height = opcode & 0x000F;
 		
 			v[0xF] = 0;//collision flag
 	
 			for(_y = 0; _y < height; _y++){
-				printf("Adding %d and %d\n", i, _x);
-				line = memory[i + _x];	
+			//	printf("Adding %d and %d\n", i, _x);
+				line = memory[i + _y];	
 				for(_x= 0; _x < 8; _x++){
 					px = line & (0x80 >> _x);	
 					if(px != 0){
@@ -123,6 +127,7 @@ void chip_run(){
 			}
 			pc+=2;
 			needsRedraw = true;	
+			printf("Drawing @ v[%d]=%d, v[%d]=%d\n", (opcode&0x0F00)>>8, x, (opcode&0x00F0) >> 4, y);	
 			break;
 		
 		default:
@@ -133,41 +138,69 @@ void chip_run(){
 
 }
 
-void removeDrawFlag(){
-	needsRedraw = false;
-}
-
-
-
 int display_init(){
-	printf("Starting display\n");
-	if(SDL_Init(SDL_INIT_EVERYTHING) < 0) return 1;
+	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
 
-	window = SDL_CreateWindow("Connor's Chip 8 Emulator",
-		SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-		SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
+	window = SDL_CreateWindow(
+		"Connor's Chip 8 Emulator",
+		SDL_WINDOWPOS_UNDEFINED,
+		SDL_WINDOWPOS_UNDEFINED,
+		SCREEN_WIDTH * RESIZE_FACTOR,
+		SCREEN_HEIGHT * RESIZE_FACTOR,
+		SDL_WINDOW_OPENGL);
+
 	if(window == NULL)
-		return 1;
-
-	renderer = SDL_CreateRenderer(window, -1, 0);
-	SDL_RenderSetLogicalSize(renderer, SCREEN_WIDTH, SCREEN_HEIGHT);
-
-	texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
-		SDL_TEXTUREACCESS_STREAMING, SCREEN_WIDTH/RESIZE_FACTOR,
-		SCREEN_HEIGHT/RESIZE_FACTOR);
+		return 1;	
+	
+	renderer = SDL_CreateRenderer(
+		window, 0, SDL_RENDERER_ACCELERATED);
 
 	return 0;
 }
 
-int display_update(){
-	printf("updating\n");
-	SDL_UpdateTexture(texture, NULL, display, SCREEN_WIDTH/RESIZE_FACTOR * sizeof(unsigned char *));
+void display_update(){
+	display_clear();
 
-	SDL_RenderClear(renderer);
-	SDL_RenderCopy(renderer, texture, NULL, NULL);
+	for(int y = 0; y < SCREEN_HEIGHT; y++){
+		for(int x = 0; x < SCREEN_WIDTH; x++){
+			display_draw(x,y,RESIZE_FACTOR, RESIZE_FACTOR,
+				display[ (y*SCREEN_WIDTH)+x ] != 0 ? true : false);
+		}	
+	}
+
 	SDL_RenderPresent(renderer);
-	return 0;
 }
 
+void display_destroy(){
+	if(renderer){
+		SDL_DestroyRenderer(renderer);
+		renderer = NULL;	
+	}
 
+	if(window){
+		SDL_DestroyWindow(window);
+		window = NULL;
+	}
 
+	SDL_Quit();
+}
+
+void display_clear(){
+	SDL_RenderClear(renderer);
+}
+
+void display_draw(int x, int y, int w, int h, bool fill){
+	SDL_SetRenderDrawColor(
+		renderer,
+		fill ? 0 : 255,
+		fill ? 0 : 255,
+		fill ? 0 : 255,
+		255);
+
+	SDL_RenderFillRect(renderer, &(SDL_Rect){
+		.x = x * RESIZE_FACTOR,
+		.y = y * RESIZE_FACTOR,
+		.w = w,
+		.h = h});
+
+}

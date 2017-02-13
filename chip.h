@@ -7,10 +7,8 @@
 #include <stdlib.h>
 	
 #define RESIZE_FACTOR 10
-#define SCREEN_HEIGHT 320
-#define SCREEN_WIDTH 640
-#define BPP 4
-#define SCREEN_DEPTH 10
+#define SCREEN_HEIGHT 32
+#define SCREEN_WIDTH 64
 
 unsigned char memory[4096];//4kb memory
 unsigned char v[16];//registers
@@ -30,24 +28,20 @@ unsigned char display[SCREEN_HEIGHT * SCREEN_WIDTH];
 bool needsRedraw;
 
 
-SDL_Window * window;
-SDL_Renderer * renderer;
-SDL_Texture * texture;
+SDL_Window *window;
+SDL_Renderer *renderer;
 
 void chip_init();
 void chip_run();
 void chip_load_file(char * file);
 
-void removeDrawFlag();
 
 
 int display_init();
-int display_clear();
-int display_draw(int x, int y, int c);
-void display_setpx(int x, int y, unsigned char r, unsigned char g, unsigned char b);
-int display_update();
-
-
+void display_update();
+void display_destroy();
+void display_clear();
+void display_draw(int x, int y, int w, int h, bool fill);
 static const unsigned char fontset[5*16] = {
 	0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
 	0x20, 0x60, 0x20, 0x20, 0x70, // 1
