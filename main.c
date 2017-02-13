@@ -1,17 +1,14 @@
 #include "chip.h"
 
-void signal_handler(int sig){
-	SDL_Quit();	
-	abort();
-}
-
 void start(){
 	while(1){
-		if(event.type == SDL_QUIT)
+		SDL_Event e;
+		if(e.type == SDL_QUIT)
 			exit(0);
-		if(SDL_PollEvent(&event))
+		if(SDL_PollEvent(&e))
 			continue;
 		chip_run();
+		display_update();	
 		if(needsRedraw){
 			display_update();	
 			removeDrawFlag();
@@ -21,10 +18,8 @@ void start(){
 }
 
 int main(int argv, char ** argc){
-	signal(SIGINT, signal_handler);	
-
 	chip_init();
-	chip_load(argc[1]);
+	chip_load_file(argc[1]);
 	display_init();	
 	start();
 

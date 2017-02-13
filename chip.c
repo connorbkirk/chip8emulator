@@ -8,9 +8,16 @@ void chip_init(){
 	sound_timer = 0;
 
 	needsRedraw = false;
+
+	chip_load_fontset();
 }
 
-void chip_load(char * file){
+void chip_load_fontset(){
+	for(int i = 0; i < 5*16; i++)
+		memory[i+0x50] = fontset[i];
+}
+
+void chip_load_file(char * file){
 	FILE *fp;
 	size_t read;
 
@@ -58,7 +65,7 @@ void chip_run(){
 			break;
 
 		case 0x3000://3XNN - skips the next instructions if VX == NN
-			if( v[opcode&0x0F00] == opcode&0x00FF )
+			if( v[opcode&0x0F00] == (opcode&0x00FF) )
 				pc+=4;
 			else
 				pc+=2;	
@@ -101,7 +108,6 @@ void chip_run(){
 			break;
 	}	
 
-	//execute opcode
 }
 
 void removeDrawFlag(){
@@ -112,85 +118,32 @@ void removeDrawFlag(){
 
 int display_init(){
 	printf("Starting display\n");
-	if(SDL_Init(SDL_INIT_VIDEO) < 0) return 1;
+	if(SDL_Init(SDL_INIT_EVERYTHING) < 0) return 1;
 
-	if(!(screen = SDL_SetVideoMode(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_DEPTH, SDL_HWSURFACE))){
-		SDL_Quit();
+	window = SDL_CreateWindow("Connor's Chip 8 Emulator",
+		SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+		SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
+	if(window == NULL)
 		return 1;
-	}
+
+	renderer = SDL_CreateRenderer(window, -1, 0);
+	SDL_RenderSetLogicalSize(renderer, SCREEN_WIDTH, SCREEN_HEIGHT);
+
+	texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
+		SDL_TEXTUREACCESS_STREAMING, SCREEN_WIDTH/RESIZE_FACTOR,
+		SCREEN_HEIGHT/RESIZE_FACTOR);
 
 	return 0;
-}
-
-int display_clear(){
-	int x, y;
-
-	for(y = 0; y < 32; y++){
-		for(x = 0; x < 64; x++){
-			display_draw(x,y,0);
-		}
-	}
-
-	if(SDL_MUSTLOCK(screen))
-		SDL_UnlockSurface(screen);
-	SDL_Flip(screen);
-
-	return 0;
-}
-
-int display_draw(int x, int y, int c){
-	int yw;
-	int blocky;
-	int blockx;
-	x = x * RESIZE_FACTOR;
-	y = y * RESIZE_FACTOR;
-
-	if(c==1)
-		c=128;
-	else
-		c=0;	
-
-	if(SDL_MUSTLOCK(screen)){
-		if(SDL_LockSurface(screen) < 0)
-			return 1;	
-	}
-
-	for(blocky = 0; blocky < RESIZE_FACTOR; blocky++){
-		yw = y*screen->pitch / BPP;
-		for(blockx=0; blockx<RESIZE_FACTOR; blockx++){
-			display_setpx(blockx+x, (blocky*screen->pitch/BPP) + yw, c, c, c);
-		}	
-	}
-	return 0;
-}
-
-void display_setpx(int x, int y, unsigned char r, unsigned char g, unsigned char b){
-	unsigned int *pixmem;
-	unsigned int color;
-
-	color = SDL_MapRGB(screen->format, r, g, b);
-	
-	pixmem = (unsigned int*)screen->pixels + y + x;
-	*pixmem = color;
 }
 
 int display_update(){
-	int x, y;
-	display_clear();
-	
-	for(y = 0; y < SCREEN_HEIGHT/RESIZE_FACTOR; y++){
-		for(x = 0; x < SCREEN_WIDTH/RESIZE_FACTOR; x++){
-			if( display[x*SCREEN_WIDTH+y] != 0)
-				display_draw(x,y,1);
-		}
-	}
+	SDL_UpdateTexture(texture, NULL, display, SCREEN_WIDTH/RESIZE_FACTOR * sizeof(unsigned char *));
 
-	if(SDL_MUSTLOCK(screen))
-		SDL_UnlockSurface(screen);
-	SDL_Flip(screen);
+	SDL_RenderClear(renderer);
+	SDL_RenderCopy(renderer, texture, NULL, NULL);
+	SDL_RenderPresent(renderer);
 	return 0;
 }
-
 
 
 
