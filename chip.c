@@ -150,7 +150,26 @@ void chip_run(){
 			needsRedraw = true;	
 			printf("Drawing @ v[%d]=%d, v[%d]=%d\n", (opcode&0x0F00)>>8, x, (opcode&0x00F0) >> 4, y);	
 			break;
-		
+	
+		case 0xF000://multicase
+			switch(opcode & 0x00FF){
+				case 0x0033://FX33 store a binary coded decimal value VX in i,i+1,i+2
+					_x = v[ (opcode & 0x0F00) >> 8];
+					memory[i] = _x / 100;
+					memory[i+1] = (_x%100)/100;
+					memory[i+2] = _x % 10;
+
+					pc+=2;
+					printf("Storing binary coded decimal V[ %d ] = %d as {%d, %d, %d}\n", (opcode & 0x0F00) >> 8, _x, memory[i], memory[i+1], memory[i+2]); 
+
+					break;
+				default:
+					printf("Unsupported opcode: %04x. System exit\n", opcode);
+					exit(EXIT_FAILURE);
+					break;
+			}
+			break;
+			
 		default:
 			printf("Unsupported opcode: %04x. System exit\n", opcode);
 			exit(EXIT_FAILURE);	
