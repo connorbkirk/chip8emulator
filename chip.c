@@ -31,7 +31,7 @@ void chip_load_file(char * file){
 	
 	read = fread(memory+0x200, 1, 4096-0x200, fp);
 	if( read == 0){
-		fprintf(stderr, "File %s could not be read\n", file);
+		//fprintf(stderr, "File %s could not be read\n", file);
 		exit(EXIT_FAILURE);	
 	}	
 
@@ -42,8 +42,9 @@ void chip_load_file(char * file){
 }
 
 void chip_run(){
-	unsigned short opcode, address;
-
+	unsigned short opcode, address, x, y, height, line;
+	unsigned char _x, _y, px;
+	
 	//fetch opcode
 	opcode = memory[pc] << 8 | memory[pc+1];
 	printf("Opcode: %02x\n", opcode);
@@ -93,13 +94,35 @@ void chip_run(){
 			}
 
 		case 0xA000://ANNN - set i to NNN
-			address = opcode & 0xF000;
+			address = opcode & 0x0FFF;
 			i = address;
 			pc+=2;
 			break;
 
 		case 0xD000: //DXYN - draw a sprite (X,Y) size (8,N) located at I
-			pc+=2;	
+			x = v[ opcode & 0x0F00 ];	
+			y = v[ opcode & 0x00F0 ];	
+			height = opcode & 0x000F;
+		
+			v[0xF] = 0;//collision flag
+	
+			for(_y = 0; _y < height; _y++){
+				printf("Adding %d and %d\n", i, _x);
+				line = memory[i + _x];	
+				for(_x= 0; _x < 8; _x++){
+					px = line & (0x80 >> _x);	
+					if(px != 0){
+						address = (y+_y)*SCREEN_WIDTH + (x+_x);
+						
+						if(display[address] == 1)
+							v[0xF] = 1;
+						
+						display[address] ^= 1;	
+					}
+				}	
+			}
+			pc+=2;
+			needsRedraw = true;	
 			break;
 		
 		default:

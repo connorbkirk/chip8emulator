@@ -8,12 +8,11 @@ void start(){
 		if(SDL_PollEvent(&e))
 			continue;
 		chip_run();
-		display_update();	
 		if(needsRedraw){
 			display_update();	
 			removeDrawFlag();
 		}
-		usleep(10);
+		usleep(10000);
 	}
 }
 
