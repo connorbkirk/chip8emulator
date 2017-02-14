@@ -153,16 +153,38 @@ void chip_run(){
 	
 		case 0xF000://multicase
 			switch(opcode & 0x00FF){
-				case 0x0033://FX33 store a binary coded decimal value VX in i,i+1,i+2
+
+				case 0x0029://FX29 - set i to location of the sprite for character vx (fontset)
+				_x = v[ (opcode & 0x0F00) >> 8];
+				i = 0x050 + _x * 5;
+				printf("Setting i to character v[%d] = %d offset to %04x", 
+					(opcode & 0x0F00) >> 8, _x, i);
+				pc+=2;
+				
+				break;	
+				case 0x0033://FX33 - store a binary coded decimal value VX in i,i+1,i+2
 					_x = v[ (opcode & 0x0F00) >> 8];
 					memory[i] = _x / 100;
-					memory[i+1] = (_x%100)/100;
+					memory[i+1] = (_x%100)/10;
 					memory[i+2] = _x % 10;
 
 					pc+=2;
 					printf("Storing binary coded decimal V[ %d ] = %d as {%d, %d, %d}\n", (opcode & 0x0F00) >> 8, _x, memory[i], memory[i+1], memory[i+2]); 
 
 					break;
+				
+				case 0x0065://FX65 - fills v0 to vx with values from i
+					_x = (opcode & 0xF00) >> 8;
+					for(_y = 0; _y < _x; _y++){
+						v[_y] = memory[i+_y];
+					}
+
+					printf("Setting v[0] to v[%d] to the values of memory[%04x]\n", _x, i&0xFFFF);
+					
+					//i += _x + 1;
+					pc+=2;	
+					break;
+
 				default:
 					printf("Unsupported opcode: %04x. System exit\n", opcode);
 					exit(EXIT_FAILURE);
