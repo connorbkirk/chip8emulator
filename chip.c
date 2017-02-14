@@ -8,7 +8,9 @@ void chip_init(){
 	sound_timer = 0;
 
 	needsRedraw = false;
-
+	running = false;
+	waitKey = false;
+	keylocation = 0;
 	chip_load_fontset();
 }
 
@@ -265,4 +267,48 @@ void display_draw(int x, int y, int w, int h, bool fill){
 		.w = w,
 		.h = h});
 
+}
+
+void display_handle_input(){
+	int key = display_handle_keys();
+
+	if(key == KEY_QUIT){
+		running = false;
+	}else if(key == KEY_CLEAR){
+		memset(keys, 0, sizeof(keys));
+	}
+
+	if(key >= KEY_ONE && key <= KEY_V){
+		keys[key] = 1;
+
+		if(waitKey){
+			v[keylocation] = key;
+			waitKey = false;
+		}
+	}
+}
+
+int display_handle_keys(){
+	const unsigned char * keys;
+	int i;
+	
+	SDL_Delay(1000 / 650);
+
+	SDL_Event e;
+	
+	while(SDL_PollEvent(&e) != 0){
+		if(e.type == SDL_QUIT)
+			return KEY_QUIT;
+		else if(e.type == SDL_KEYUP)
+			return KEY_CLEAR;
+	}
+
+	keys = SDL_GetKeyboardState(NULL);
+
+	for(i = 0; i < KEY_SIZE; i++){
+		if(keys[key_key[i]])
+			return key_value[i];
+	}
+
+	return KEY_NO;
 }

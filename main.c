@@ -1,8 +1,11 @@
 #include "chip.h"
 
 void start(){
-	while(1){
-		chip_run();
+	running = true;	
+	while(running){
+		if(!waitKey)
+			chip_run();
+		display_handle_input();
 		if(needsRedraw){
 			needsRedraw = false;
 			display_update();
