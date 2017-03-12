@@ -49,7 +49,7 @@ void chip_run(){
 	
 	//fetch opcode
 	opcode = memory[pc] << 8 | memory[pc+1];
-	printf("Opcode: %02x\n", opcode);
+	printf("%02x: ", opcode);
 	
 	//decode opcode
 	switch(opcode & 0xF000){//mask to get first nibble
@@ -76,6 +76,7 @@ void chip_run(){
 		case 0x1000://1NNN - jump to address NNN
 			address = opcode & 0x0FFF;//bitmap
 			pc = address;
+			printf("Jumping to %04x\n", pc);	
 			break;
 
 		case 0x2000://2NNN - call subroutine at address NNN
@@ -89,10 +90,17 @@ void chip_run(){
 			break;
 
 		case 0x3000://3XNN - skips the next instructions if VX == NN
-			if( v[ (opcode&0x0F00) >> 8 ] == (opcode&0x00FF) )
+			x = (opcode & 0x0F00) >> 8;
+			y = (opcode & 0x00FF);//NN	
+
+			if( v[x] == y ){
+				printf("Skipping next instruction (v[%d] == %d\n", x, y);
 				pc+=4;
-			else
+			}
+			else{
+				printf("Not skipping next instruction (v[%d] != %d)\n", x, y); 
 				pc+=2;	
+			}
 			break;
 		
 		case 0x6000://6XNN - set VX to NN
@@ -126,6 +134,15 @@ void chip_run(){
 			printf("Set i to %04x\n", i);
 			break;
 
+		case 0xC000://CXNN - set v[X] to a random number and NN
+			x = (opcode & 0x0F00) >> 8;
+			y = (opcode & 0x00FF);//NN
+			_x = rand() % 256;//random number betwwen 0 and 255;	
+			v[x] = _x & y;	
+			pc+=2;	
+			printf("v[%d] has been set to (rand)%d\n", x, v[x]);	
+			break;
+
 		case 0xD000: //DXYN - draw a sprite (X,Y) size (8,N) located at I
 			x = v[ (opcode & 0x0F00) >> 8 ];	
 			y = v[ (opcode & 0x00F0) >> 4 ];	
@@ -153,17 +170,55 @@ void chip_run(){
 			printf("Drawing @ v[%d]=%d, v[%d]=%d\n", (opcode&0x0F00)>>8, x, (opcode&0x00F0) >> 4, y);	
 			break;
 	
+		case 0xE000:
+			switch(opcode & 0x00FF){
+				case 0x009E://EX9E - skip next instr if the key v[X] is pressed
+					x = (opcode & 0x0F00) >> 8;
+					if(keys[x] == 1)
+						pc+=4;
+					else
+						pc+=2;
+					break;
+				case 0x00A1://EXA1 - skip next instr if the key v[X] is not pressed
+					x = (opcode & 0x0F00) >> 8;
+					if(keys[x] == 0)
+						pc+=4;
+					else
+						pc+=2;
+					break;
+
+				default:
+					printf("Unsupported opcode: %04x. System exit\n", opcode);
+					exit(EXIT_FAILURE);
+					break;
+			}	
+			break;		
+
 		case 0xF000://multicase
 			switch(opcode & 0x00FF){
 
+				case 0x0007://FX07 - set v[X] to the value of delay_timer
+					x = (opcode & 0x0F00) >> 8;
+					v[x] = delay_timer;
+					pc+=2;
+					printf("v[%d] has been set to %d\n", x, delay_timer);
+				//	break;
+
+				case 0x0015://FX15 - set delay timer to v[X]
+					x = (opcode & 0x0F00) >> 8;
+					delay_timer = v[x];
+					pc+=2;
+					printf("Set delay timer to v[%d] = %d\n", x, delay_timer);	
+				//	break;
+
 				case 0x0029://FX29 - set i to location of the sprite for character vx (fontset)
-				_x = v[ (opcode & 0x0F00) >> 8];
-				i = 0x050 + _x * 5;
-				printf("Setting i to character v[%d] = %d offset to %04x", 
-					(opcode & 0x0F00) >> 8, _x, i);
-				pc+=2;
+					_x = v[ (opcode & 0x0F00) >> 8];
+					i = 0x050 + _x * 5;
+					printf("Setting i to character v[%d] = %d offset to %04x", 
+						(opcode & 0x0F00) >> 8, _x, i);
+					pc+=2;
 				
-				break;	
+					break;	
 				case 0x0033://FX33 - store a binary coded decimal value VX in i,i+1,i+2
 					_x = v[ (opcode & 0x0F00) >> 8];
 					memory[i] = _x / 100;
