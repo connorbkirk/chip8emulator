@@ -1,5 +1,9 @@
 #include "chip.h"
 void chip_init(){
+	memset( memory, 0, sizeof(memory) );
+	memset( v, 0, sizeof(v) );
+	memset( keys, 0, sizeof(keys) );
+
 	i = 0x0;
 	pc = 0x200;
 	sp = 0;
@@ -102,7 +106,19 @@ void chip_run(){
 				pc+=2;	
 			}
 			break;
-		
+	
+		case 0x4000://4XNN: skip next instruction if v[x] != nn
+			x = (opcode & 0xF00) >> 8;
+			y = opcode & 0x0FF;//nn
+
+			if( v[x] != y )
+				pc+=4;
+			else
+				pc+=2;
+
+			printf("Skipping next instruction if v[%d] != %d\n", x, y);
+			break;
+	
 		case 0x6000://6XNN - set VX to NN
 			v[ (opcode&0x0F00) >> 8 ] = opcode&0x00FF;
 			pc+=2;
@@ -118,8 +134,32 @@ void chip_run(){
 		case 0x8000:
 			switch(opcode & 0x000F){//mask to get last nibble
 				case 0x0000://8XY0 - set VX to XY
-					v[opcode&0x0f00]=v[opcode&0x00f0];
+					x = (opcode & 0x0f00) >> 8;
+					y = (opcode & 0x00f0) >> 4;
+					v[x] = v[y];
+					printf("Set v[%d] to v[%d] = %d\n", x, y, v[x]);
+					pc+=2;
 					break;
+
+				case 0x0002://8XY2 - set v[X] to v[X] & v[Y]
+					x = (opcode & 0x0f00) >> 8;
+					y = (opcode & 0x00f0) >> 4;
+					v[x] = v[x] & v[y];
+					printf("Set v[%d] to v[%d] & v[%d] = %d\n", x, x, y, v[x]);
+					pc+=2;
+					break;
+		
+				case 0x0004://8XY4 - adds v[y] to v[x]. v[f] is set to 1 when overflow. v[f] is set to 0 if no overflow
+					x = (opcode & 0x0f00) >> 8;
+					y = (opcode & 0x00f0) >> 4;
+					if(v[y] > 255 - v[x])
+						v[0xF] = 1;
+					else
+						v[0xF] = 0;
+					v[x] = (v[x]+v[y]) & 0xFF;
+					printf("Adding v[%d] to v[%d] = %d\n", y, x, v[x]);
+					pc+=2;	
+					break;	
 				default:
 					printf("Unsupported opcode: %04x\n. System exit\n", opcode);
 					exit(EXIT_FAILURE);	
@@ -174,17 +214,18 @@ void chip_run(){
 			switch(opcode & 0x00FF){
 				case 0x009E://EX9E - skip next instr if the key v[X] is pressed
 					x = (opcode & 0x0F00) >> 8;
-					if(keys[x] == 1)
+					if(keys[ v[x] ] == 1)
 						pc+=4;
 					else
 						pc+=2;
 					break;
 				case 0x00A1://EXA1 - skip next instr if the key v[X] is not pressed
 					x = (opcode & 0x0F00) >> 8;
-					if(keys[x] == 0)
+					if(keys[ v[x] ] == 0)
 						pc+=4;
 					else
 						pc+=2;
+					printf("Skipping next instruction if v[%d] is NOT pressed\n", x);
 					break;
 
 				default:
@@ -202,14 +243,14 @@ void chip_run(){
 					v[x] = delay_timer;
 					pc+=2;
 					printf("v[%d] has been set to %d\n", x, delay_timer);
-				//	break;
+					//break;
 
 				case 0x0015://FX15 - set delay timer to v[X]
 					x = (opcode & 0x0F00) >> 8;
 					delay_timer = v[x];
 					pc+=2;
 					printf("Set delay timer to v[%d] = %d\n", x, delay_timer);	
-				//	break;
+					//break;
 
 				case 0x0029://FX29 - set i to location of the sprite for character vx (fontset)
 					_x = v[ (opcode & 0x0F00) >> 8];
@@ -231,14 +272,14 @@ void chip_run(){
 					break;
 				
 				case 0x0065://FX65 - fills v0 to vx with values from i
-					_x = (opcode & 0xF00) >> 8;
-					for(_y = 0; _y < _x; _y++){
-						v[_y] = memory[i+_y];
+					x = (opcode & 0xF00) >> 8;
+					for(y = 0; y < x; y++){
+						v[y] = memory[i+y];
 					}
 
-					printf("Setting v[0] to v[%d] to the values of memory[%04x]\n", _x, i&0xFFFF);
+					printf("Setting v[0] to v[%d] to the values of memory[%04x]\n", x, i&0xFFFF);
 					
-					//i += _x + 1;
+					i += x + 1;
 					pc+=2;	
 					break;
 
@@ -326,6 +367,7 @@ void display_draw(int x, int y, int w, int h, bool fill){
 
 void display_handle_input(){
 	int key = display_handle_keys();
+	printf("Just got the key %d\n", key);
 
 	if(key == KEY_QUIT){
 		running = false;
@@ -344,7 +386,7 @@ void display_handle_input(){
 }
 
 int display_handle_keys(){
-	const unsigned char * keys;
+	const unsigned char * keystate;
 	int i;
 	
 	SDL_Delay(1000 / 650);
@@ -358,10 +400,10 @@ int display_handle_keys(){
 			return KEY_CLEAR;
 	}
 
-	keys = SDL_GetKeyboardState(NULL);
+	keystate = SDL_GetKeyboardState(NULL);
 
 	for(i = 0; i < KEY_SIZE; i++){
-		if(keys[key_key[i]])
+		if(keystate[key_key[i]])
 			return key_value[i];
 	}
 
