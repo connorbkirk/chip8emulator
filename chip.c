@@ -59,12 +59,14 @@ void chip_run(){
 	switch(opcode & 0xF000){//mask to get first nibble
 		case 0x0000://Multi-case
 			switch(opcode & 0x0FF){//mask to get last 2 nibbles
-				case 0x00E0: //clear screen
+				case 0x00E0://00E0 - clear screen
 					display_clear();
+					memset(display, 0, sizeof(display));
+					needsRedraw = true;
 					pc+=2;
 					break;
 				
-				case 0x00EE: //return from subroutine
+				case 0x00EE://00EE - return from subroutine
 					sp--;	
 					pc = stack[sp] + 2;
 					printf("Returning to %04x\n", pc);	
@@ -111,12 +113,27 @@ void chip_run(){
 			x = (opcode & 0xF00) >> 8;
 			y = opcode & 0x0FF;//nn
 
-			if( v[x] != y )
+			if( v[x] != y ){
+				printf("Skipping next instruction since v[%d] != %d\n", x, y);
 				pc+=4;
-			else
+			}
+			else{
+				printf("Not skipping next instruction since v[%d] == %d\n", x, y); 
 				pc+=2;
+			}
+			break;
 
-			printf("Skipping next instruction if v[%d] != %d\n", x, y);
+		case 0x5000://5XY0 - skip next instruction is v[x] == v[y]
+			x = (opcode & 0xF00) >> 8;
+			y = (opcode & 0x0F0) >> 4;
+
+			if( v[x] == v[y] ){
+				printf("Skipping next instruction since v[%d] == v[%d]\n", x, y);
+				pc+=4;
+			}else{
+				printf("Not skipping next instruction since v[%d] != v[%d]\n", x, y);
+				pc+=2;
+			}			
 			break;
 	
 		case 0x6000://6XNN - set VX to NN
@@ -141,6 +158,14 @@ void chip_run(){
 					pc+=2;
 					break;
 
+				case 0x0001://8XY1 - set v[x] to v[x] or v[y]
+					x = (opcode & 0x0f00) >> 8;
+					y = (opcode & 0x00f0) >> 4;
+					v[x] = (v[x] | v[y]) & 0xFF;
+					printf("Setting v[%d] = v[%d] | v[%d]\n", x, x, y);	
+					pc+=2;
+					break;
+
 				case 0x0002://8XY2 - set v[X] to v[X] & v[Y]
 					x = (opcode & 0x0f00) >> 8;
 					y = (opcode & 0x00f0) >> 4;
@@ -148,7 +173,15 @@ void chip_run(){
 					printf("Set v[%d] to v[%d] & v[%d] = %d\n", x, x, y, v[x]);
 					pc+=2;
 					break;
-		
+				
+				case 0x0003://8XY3 - set v[x] to v[x] xor v[y]
+					x = (opcode & 0x0f00) >> 8;
+					y = (opcode & 0x00f0) >> 4;
+					v[x] = (v[x] ^ v[y]) & 0xFF;
+					printf("Setting v[%d] = v[%d] ^ v[%d]\n", x, x, y);	
+					pc+=2;
+					break;
+
 				case 0x0004://8XY4 - adds v[y] to v[x]. v[f] is set to 1 when overflow. v[f] is set to 0 if no overflow
 					x = (opcode & 0x0f00) >> 8;
 					y = (opcode & 0x00f0) >> 4;
@@ -177,6 +210,34 @@ void chip_run(){
 					pc+=2;	
 					break;
 
+				case 0x0006://8XY6 - shift v[x] right 1, v[F] is set to the least significant bit of v[X]
+					x = (opcode & 0xF00) >> 8;
+					v[0xF] = (v[x] & 0x1);	
+					v[x] = v[x] >> 1;
+					printf("Shift v[%d] >> 1 and v[F] to LSB of v[%d]\n", x, x);	
+					pc+=2;	
+					break;
+				
+				case 0x0007://8XY7 - sets v[x] to v[y] - v[x]. v[f] is set to 0 when there is a borrow. and 1 when there isnt
+					x = (opcode & 0x0f00) >> 8;
+					y = (opcode & 0x00f0) >> 4;
+					if(v[x] > v[y])
+						v[0xF] = 0;
+					else
+						v[0xF] = 1;
+					v[x] = (v[y]-v[x]) & 0xFF;
+					printf("Setting v[%d] to v[%d] - v[%d] = %d\n", x, y, x, v[x]);
+					pc+=2;	
+					break;	
+
+				case 0x000E://8XYE - shift v[x] left by 1. v[f] is set to the value of the most significant bit of v[x] before shift
+					x = (opcode & 0xF00) >> 8;
+					v[0xF] = (v[x] & 0x80);	
+					v[x] = v[x] << 1;
+					printf("Shift v[%d] << 1 and v[F] to MSB of v[%d]\n", x, x);	
+					pc+=2;	
+					break;
+				
 				default:
 					printf("Unsupported opcode: %04x\n. System exit\n", opcode);
 					exit(EXIT_FAILURE);	
@@ -184,11 +245,30 @@ void chip_run(){
 			}
 			break;
 
+		case 0x9000://9XY0 - skip next instruction if v[x] != v[y]
+			x = (opcode & 0xF00) >> 8;
+			y = (opcode & 0x0F0) >> 4;
+
+			if( v[x] != v[y] ){
+				printf("Skipping next instruction since v[%d] != v[%d]\n", x, y);
+				pc+=4;
+			}else{
+				printf("Not skipping next instruction since v[%d] == v[%d]\n", x, y);
+				pc+=2;
+			}			
+			break;
+	
 		case 0xA000://ANNN - set i to NNN
 			address = opcode & 0x0FFF;
 			i = address;
 			pc+=2;
 			printf("Set i to %04x\n", i);
+			break;
+
+		case 0xB000://BNNN - jump to address NNN + v[0]
+			address = (opcode & 0x0FFF) + (v[0] & 0xFF);
+			pc=address;
+			printf("Set pc to the address %04x\n", address);
 			break;
 
 		case 0xC000://CXNN - set v[X] to a random number and NN
@@ -262,6 +342,13 @@ void chip_run(){
 					printf("v[%d] has been set to %d\n", x, delay_timer);
 					break;
 
+				case 0x000A://FX0A - A key press is awaited, and then stored in v[x]
+					x = (opcode & 0x0F00) >> 8;
+					waitKey = true;
+					keylocation = x;	
+					pc+=2;
+					break;	
+	
 				case 0x0015://FX15 - set delay timer to v[X]
 					x = (opcode & 0x0F00) >> 8;
 					delay_timer = v[x];
@@ -273,6 +360,13 @@ void chip_run(){
 					x = (opcode & 0x0F00) >> 8;
 					sound_timer = v[x];
 					pc+=2;
+					break;
+
+				case 0x001E://FX1E - adds v[x] to i
+					x = (opcode & 0x0F00) >> 8;
+					i += v[x];
+					printf("Adding v[%d] = %d to i\n", x, v[x]);
+					pc+=2;		
 					break;
 
 				case 0x0029://FX29 - set i to location of the sprite for character vx (fontset)
@@ -294,9 +388,19 @@ void chip_run(){
 
 					break;
 				
+				case 0x0055://FX55 - stores v0 to vx in memory starting at adress i
+					x = (opcode & 0xF00) >> 8;
+					for(y = 0; y <= x; y++){
+						memory[i + y] = v[i];
+					}
+					printf("Setting memory[%04x+n] = v[0] to v[%d]", i, x);
+						
+					pc+=2;
+					break;
+	
 				case 0x0065://FX65 - fills v0 to vx with values from i
 					x = (opcode & 0xF00) >> 8;
-					for(y = 0; y < x; y++){
+					for(y = 0; y <= x; y++){
 						v[y] = memory[i+y];
 					}
 
