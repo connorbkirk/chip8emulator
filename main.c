@@ -10,7 +10,7 @@ void start(){
 			needsRedraw = false;
 			display_update();
 		}	
-		usleep(20000);
+		//usleep(20000);
 	}
 }
 

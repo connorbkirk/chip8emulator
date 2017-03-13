@@ -160,6 +160,23 @@ void chip_run(){
 					printf("Adding v[%d] to v[%d] = %d\n", y, x, v[x]);
 					pc+=2;	
 					break;	
+
+				case 0x0005://8VX5 - v[x] -= v[y]. v[f] is set to 0 when there is a borrow. else it is set to 1
+					x = (opcode & 0x0f00) >> 8;
+					y = (opcode & 0x00f0) >> 4;
+					
+					printf("v[%d] -= v[%d]\n", x, y);	
+					if(v[x] > v[y]){
+						v[0xF] = 1;
+						printf("No borrow\n");
+					}else{
+						v[0xF] = 0;
+						printf("Borrow\n");
+					}
+					v[x] = ( v[x] - v[y] ) & 0xFF;			
+					pc+=2;	
+					break;
+
 				default:
 					printf("Unsupported opcode: %04x\n. System exit\n", opcode);
 					exit(EXIT_FAILURE);	
@@ -243,14 +260,20 @@ void chip_run(){
 					v[x] = delay_timer;
 					pc+=2;
 					printf("v[%d] has been set to %d\n", x, delay_timer);
-					//break;
+					break;
 
 				case 0x0015://FX15 - set delay timer to v[X]
 					x = (opcode & 0x0F00) >> 8;
 					delay_timer = v[x];
 					pc+=2;
 					printf("Set delay timer to v[%d] = %d\n", x, delay_timer);	
-					//break;
+					break;
+
+				case 0x0018://FX18 - set the sound timer to v[x]
+					x = (opcode & 0x0F00) >> 8;
+					sound_timer = v[x];
+					pc+=2;
+					break;
 
 				case 0x0029://FX29 - set i to location of the sprite for character vx (fontset)
 					_x = v[ (opcode & 0x0F00) >> 8];
@@ -295,7 +318,11 @@ void chip_run(){
 			exit(EXIT_FAILURE);	
 			break;
 	}	
-
+	
+	if(sound_timer > 0)
+		sound_timer--;
+	if(delay_timer > 0)
+		delay_timer--;
 }
 
 int display_init(){
